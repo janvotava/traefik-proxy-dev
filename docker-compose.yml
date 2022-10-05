@@ -1,0 +1,45 @@
+version: '3.7'
+
+services:
+  reverse-proxy:
+    image: traefik:v2.8
+    command:
+      - --log=true
+      - --log.level=INFO # PANIC, FATAL, ERROR, WARN, INFO, DEBUG
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.swarmMode=true
+      - --providers.docker.network=proxy
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --certificatesresolvers.cloudflare.acme.email=${CF_DNS_EMAIL?Variable not set}
+      - --certificatesresolvers.cloudflare.acme.dnsChallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnsChallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.storage=/data/acme.json
+
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN?Variable not set}
+
+    ports:
+      # The HTTP(s) ports
+      - "80:80"
+      - "443:443"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      - ./data:/data:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
